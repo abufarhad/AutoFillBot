@@ -1,6 +1,59 @@
+# Environment variables
 .env
-.idea
-.DS_Store
-tests/unit/coverage
-*.iml
+
+# IDE/editor folders and files
+.idea/
 .vscode/
+*.iml
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails and icon caches
+._*
+.Spotlight-V100
+.Trashes
+.DS_Store?
+
+# Test coverage
+tests/unit/coverage/
+coverage/
+*.lcov
+
+# Build output
+dist/
+build/
+out/
+
+# Logs
+*.log
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# JetBrains IDE
+out/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.temp
+
+# Other common files
+*.bak
+*.backup
+*.old
+*.orig
+
