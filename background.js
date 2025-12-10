@@ -12,8 +12,8 @@ const STORAGE_CONFIG = {
 
 // Initialize extension on install
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Form Autofill Saver installed');
-  
+  console.log('Form Autofill Saver installed with array field support');
+
   // Initialize storage with empty profiles if not exists
   chrome.storage.local.get([STORAGE_CONFIG.SITE_PROFILES_KEY], (result) => {
     if (!result[STORAGE_CONFIG.SITE_PROFILES_KEY]) {
@@ -28,59 +28,59 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'getFormData':
       getFormDataFromTab(request.tabId, sendResponse);
       return true;
-      
+
     case 'saveFormProfile':
       saveFormProfile(request.label, request.urls, request.formData, sendResponse);
       return true;
-      
+
     case 'getProfilesForSite':
       getProfilesForSite(request.url, sendResponse);
       return true;
-      
+
     case 'autofillForm':
       autofillForm(request.tabId, request.profileData, sendResponse);
       return true;
-      
+
     case 'deleteProfile':
       deleteProfile(request.profileId, sendResponse);
       return true;
-      
+
     case 'getFullProfileData':
       getFullProfileData(request.profileId, sendResponse);
       return true;
-      
+
     case 'getGlobalProfile':
       getGlobalProfile(sendResponse);
       return true;
-      
+
     case 'saveGlobalProfile':
       saveGlobalProfile(request.formData, sendResponse);
       return true;
-      
+
     case 'useGlobalProfile':
       useGlobalProfile(request.tabId, sendResponse);
       return true;
-      
+
     case 'deleteGlobalProfile':
       deleteGlobalProfile(sendResponse);
       return true;
-      
+
     case 'getAllSiteProfiles':
       getAllSiteProfiles(sendResponse);
       return true;
-      
+
     case 'updateGlobalProfile':
       updateGlobalProfile(request, sendResponse);
       return true;
-      
+
     case 'updateSiteProfile':
       updateSiteProfile(request.profileId, request, sendResponse);
       return true;
-      
+
     case 'autofillFormAndAddSite':
       autofillFormAndAddSite(request.tabId, request.profileId, request.currentUrl, request.profileData, sendResponse);
       return true;
-      
+
     default:
       sendResponse({ error: 'Unknown action' });
   }
@@ -89,9 +89,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Storage utility functions
 function compressData(data) {
   try {
+    // Don't modify the data structure, just stringify it properly
     const jsonString = JSON.stringify(data);
-    // Simple compression by removing unnecessary whitespace
-    return jsonString.replace(/\s+/g, ' ').trim();
+    return jsonString;
   } catch (e) {
     console.error('Error compressing data:', e);
     return JSON.stringify(data);
@@ -110,11 +110,11 @@ function decompressData(compressedData) {
 function chunkData(data, maxSize = STORAGE_CONFIG.MAX_ITEM_SIZE) {
   const compressed = compressData(data);
   const chunks = [];
-  
+
   for (let i = 0; i < compressed.length; i += maxSize) {
     chunks.push(compressed.slice(i, i + maxSize));
   }
-  
+
   return chunks;
 }
 
@@ -128,13 +128,13 @@ async function storeChunkedData(keyPrefix, data) {
     const chunks = chunkData(data);
     const chunkKeys = [];
     const storageObj = {};
-    
+
     // Clear existing chunks first
     chrome.storage.local.get(null, (allItems) => {
-      const keysToRemove = Object.keys(allItems).filter(key => 
-        key.startsWith(STORAGE_CONFIG.CHUNK_PREFIX + keyPrefix)
+      const keysToRemove = Object.keys(allItems).filter(key =>
+          key.startsWith(STORAGE_CONFIG.CHUNK_PREFIX + keyPrefix)
       );
-      
+
       if (keysToRemove.length > 0) {
         chrome.storage.local.remove(keysToRemove, () => {
           if (chrome.runtime.lastError) {
@@ -147,14 +147,14 @@ async function storeChunkedData(keyPrefix, data) {
         storeNewChunks();
       }
     });
-    
+
     function storeNewChunks() {
       chunks.forEach((chunk, index) => {
         const chunkKey = `${STORAGE_CONFIG.CHUNK_PREFIX}${keyPrefix}_${index}`;
         chunkKeys.push(chunkKey);
         storageObj[chunkKey] = chunk;
       });
-      
+
       // Store metadata
       const metaKey = `${keyPrefix}_meta`;
       storageObj[metaKey] = {
@@ -162,11 +162,12 @@ async function storeChunkedData(keyPrefix, data) {
         totalChunks: chunks.length,
         timestamp: Date.now()
       };
-      
+
       chrome.storage.local.set(storageObj, () => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
+          console.log(`Stored ${chunks.length} chunks for ${keyPrefix}`);
           resolve();
         }
       });
@@ -177,25 +178,25 @@ async function storeChunkedData(keyPrefix, data) {
 async function retrieveChunkedData(keyPrefix) {
   return new Promise((resolve, reject) => {
     const metaKey = `${keyPrefix}_meta`;
-    
+
     chrome.storage.local.get([metaKey], (result) => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError);
         return;
       }
-      
+
       const metadata = result[metaKey];
       if (!metadata) {
         resolve(null);
         return;
       }
-      
+
       chrome.storage.local.get(metadata.chunkKeys, (chunkData) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
           return;
         }
-        
+
         const chunks = [];
         for (let i = 0; i < metadata.totalChunks; i++) {
           const chunkKey = metadata.chunkKeys[i];
@@ -203,9 +204,10 @@ async function retrieveChunkedData(keyPrefix) {
             chunks.push(chunkData[chunkKey]);
           }
         }
-        
+
         if (chunks.length === metadata.totalChunks) {
           const reconstructedData = reconstructData(chunks);
+          console.log(`Retrieved ${chunks.length} chunks for ${keyPrefix}`);
           resolve(reconstructedData);
         } else {
           reject(new Error('Missing chunks'));
@@ -218,19 +220,19 @@ async function retrieveChunkedData(keyPrefix) {
 async function removeChunkedData(keyPrefix) {
   return new Promise((resolve, reject) => {
     const metaKey = `${keyPrefix}_meta`;
-    
+
     chrome.storage.local.get([metaKey], (result) => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError);
         return;
       }
-      
+
       const metadata = result[metaKey];
       if (!metadata) {
         resolve();
         return;
       }
-      
+
       const keysToRemove = [...metadata.chunkKeys, metaKey];
       chrome.storage.local.remove(keysToRemove, () => {
         if (chrome.runtime.lastError) {
@@ -249,6 +251,11 @@ function getFormDataFromTab(tabId, sendResponse) {
     if (chrome.runtime.lastError) {
       sendResponse({ error: chrome.runtime.lastError.message });
     } else {
+      // Log what we received from content script
+      console.log('Received form data from tab:', {
+        fieldCount: response.formData ? response.formData.length : 0,
+        sampleField: response.formData && response.formData[0] ? response.formData[0] : null
+      });
       sendResponse(response);
     }
   });
@@ -257,28 +264,38 @@ function getFormDataFromTab(tabId, sendResponse) {
 // Save a form profile to storage with chunking
 async function saveFormProfile(label, urls, formData, sendResponse) {
   try {
+    console.log('Saving profile with form data:', {
+      label,
+      urlCount: urls.length,
+      fieldCount: formData.length,
+      sampleField: formData[0]
+    });
+
     const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
-    
+
     const profileId = generateProfileId();
     const newProfile = {
       id: profileId,
       label: label,
       urls: urls,
-      fields: formData,
+      fields: formData, // Keep all field metadata intact
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     profiles[profileId] = newProfile;
-    
+
     await storeChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY, profiles);
-    
-    sendResponse({ 
-      success: true, 
+
+    console.log('Profile saved successfully:', profileId);
+
+    sendResponse({
+      success: true,
       message: 'Profile saved successfully',
       profileId: profileId
     });
   } catch (error) {
+    console.error('Error saving profile:', error);
     sendResponse({ error: error.message });
   }
 }
@@ -288,7 +305,7 @@ async function getProfilesForSite(url, sendResponse) {
   try {
     const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
     const matchingProfiles = [];
-    
+
     Object.values(profiles).forEach(profile => {
       if (profile.urls && profile.urls.some(profileUrl => urlMatches(url, profileUrl))) {
         matchingProfiles.push({
@@ -301,7 +318,9 @@ async function getProfilesForSite(url, sendResponse) {
         });
       }
     });
-    
+
+    console.log(`Found ${matchingProfiles.length} matching profiles for ${url}`);
+
     sendResponse({ profiles: matchingProfiles });
   } catch (error) {
     sendResponse({ error: error.message });
@@ -310,13 +329,20 @@ async function getProfilesForSite(url, sendResponse) {
 
 // Trigger autofill on the specified tab
 function autofillForm(tabId, profileData, sendResponse) {
+  console.log('Autofilling form with profile data:', {
+    fieldCount: profileData.fields ? profileData.fields.length : 0,
+    sampleField: profileData.fields && profileData.fields[0] ? profileData.fields[0] : null
+  });
+
   chrome.tabs.sendMessage(tabId, {
     action: 'autofillForm',
     formData: profileData.fields
   }, (response) => {
     if (chrome.runtime.lastError) {
+      console.error('Autofill error:', chrome.runtime.lastError.message);
       sendResponse({ error: chrome.runtime.lastError.message });
     } else {
+      console.log('Autofill response:', response);
       sendResponse(response || { success: true });
     }
   });
@@ -326,11 +352,11 @@ function autofillForm(tabId, profileData, sendResponse) {
 async function deleteProfile(profileId, sendResponse) {
   try {
     const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
-    
+
     if (profiles[profileId]) {
       delete profiles[profileId];
       await storeChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY, profiles);
-      sendResponse({ 
+      sendResponse({
         success: true,
         message: 'Profile deleted successfully'
       });
@@ -347,8 +373,13 @@ async function getFullProfileData(profileId, sendResponse) {
   try {
     const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
     const profile = profiles[profileId];
-    
+
     if (profile) {
+      console.log('Retrieved profile data:', {
+        id: profile.id,
+        fieldCount: profile.fields ? profile.fields.length : 0,
+        sampleField: profile.fields && profile.fields[0] ? profile.fields[0] : null
+      });
       sendResponse({ success: true, profile: profile });
     } else {
       sendResponse({ success: false, error: 'Profile not found' });
@@ -362,7 +393,7 @@ async function getFullProfileData(profileId, sendResponse) {
 async function getGlobalProfile(sendResponse) {
   try {
     const globalProfile = await retrieveChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY);
-    
+
     if (globalProfile) {
       sendResponse({ success: true, profile: globalProfile });
     } else {
@@ -382,11 +413,11 @@ async function saveGlobalProfile(formData, sendResponse) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     await storeChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY, globalProfile);
-    
-    sendResponse({ 
-      success: true, 
+
+    sendResponse({
+      success: true,
       message: 'Global profile saved successfully'
     });
   } catch (error) {
@@ -398,12 +429,12 @@ async function saveGlobalProfile(formData, sendResponse) {
 async function useGlobalProfile(tabId, sendResponse) {
   try {
     const globalProfile = await retrieveChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY);
-    
+
     if (!globalProfile) {
       sendResponse({ success: false, error: 'No global profile found' });
       return;
     }
-    
+
     chrome.tabs.sendMessage(tabId, {
       action: 'autofillForm',
       formData: globalProfile.fields
@@ -423,7 +454,7 @@ async function useGlobalProfile(tabId, sendResponse) {
 async function deleteGlobalProfile(sendResponse) {
   try {
     await removeChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY);
-    sendResponse({ 
+    sendResponse({
       success: true,
       message: 'Global profile deleted successfully'
     });
@@ -446,19 +477,19 @@ async function getAllSiteProfiles(sendResponse) {
 async function updateGlobalProfile(updateData, sendResponse) {
   try {
     const currentProfile = await retrieveChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY);
-    
+
     if (!currentProfile) {
       sendResponse({ success: false, error: 'Global profile not found' });
       return;
     }
-    
+
     const updatedProfile = {
       ...currentProfile,
       label: updateData.label || currentProfile.label,
       fields: updateData.fields || currentProfile.fields,
       updatedAt: updateData.updatedAt || new Date().toISOString()
     };
-    
+
     await storeChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY, updatedProfile);
     sendResponse({ success: true, message: 'Global profile updated successfully' });
   } catch (error) {
@@ -470,12 +501,12 @@ async function updateGlobalProfile(updateData, sendResponse) {
 async function updateSiteProfile(profileId, updateData, sendResponse) {
   try {
     const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
-    
+
     if (!profiles[profileId]) {
       sendResponse({ success: false, error: 'Profile not found' });
       return;
     }
-    
+
     const updatedProfile = {
       ...profiles[profileId],
       label: updateData.label || profiles[profileId].label,
@@ -483,7 +514,7 @@ async function updateSiteProfile(profileId, updateData, sendResponse) {
       fields: updateData.fields || profiles[profileId].fields,
       updatedAt: updateData.updatedAt || new Date().toISOString()
     };
-    
+
     profiles[profileId] = updatedProfile;
     await storeChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY, profiles);
     sendResponse({ success: true, message: 'Profile updated successfully' });
@@ -502,40 +533,40 @@ async function autofillFormAndAddSite(tabId, profileId, currentUrl, profileData,
       sendResponse({ error: chrome.runtime.lastError.message });
       return;
     }
-    
+
     try {
       const normalizedCurrentUrl = normalizeUrl(currentUrl);
       const isUrlAlreadyPresent = profileData.urls.some(url => normalizeUrl(url) === normalizedCurrentUrl);
-      
+
       if (!isUrlAlreadyPresent) {
         const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
-        
+
         if (profiles[profileId]) {
           profiles[profileId].urls.push(currentUrl);
           profiles[profileId].updatedAt = new Date().toISOString();
-          
+
           await storeChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY, profiles);
-          
-          sendResponse({ 
+
+          sendResponse({
             ...autofillResponse,
             siteAdded: true,
             message: 'Site added to profile and form autofilled'
           });
         } else {
-          sendResponse({ 
+          sendResponse({
             ...autofillResponse,
             siteAdded: false,
             error: 'Profile not found'
           });
         }
       } else {
-        sendResponse({ 
+        sendResponse({
           ...autofillResponse,
           siteAdded: false
         });
       }
     } catch (error) {
-      sendResponse({ 
+      sendResponse({
         ...autofillResponse,
         siteAdded: false,
         error: error.message
@@ -565,21 +596,21 @@ function urlMatches(currentUrl, profileUrl) {
   try {
     const currentUrlObj = new URL(currentUrl);
     const profileUrlObj = new URL(profileUrl);
-    
+
     if (currentUrl === profileUrl) {
       return true;
     }
-    
-    if (currentUrlObj.hostname === profileUrlObj.hostname && 
+
+    if (currentUrlObj.hostname === profileUrlObj.hostname &&
         currentUrlObj.pathname === profileUrlObj.pathname) {
       return true;
     }
-    
-    if (currentUrlObj.hostname === profileUrlObj.hostname && 
+
+    if (currentUrlObj.hostname === profileUrlObj.hostname &&
         currentUrlObj.pathname.startsWith(profileUrlObj.pathname)) {
       return true;
     }
-    
+
     return false;
   } catch (e) {
     console.error('Error matching URLs:', e);
@@ -601,10 +632,10 @@ async function checkAndAutoFill(tabId, url) {
   try {
     // First, check for global profile
     const globalProfile = await retrieveChunkedData(STORAGE_CONFIG.GLOBAL_PROFILE_KEY);
-    
+
     if (globalProfile) {
       console.log(`Auto-filling with global profile for URL: ${url}`);
-      
+
       chrome.tabs.sendMessage(tabId, {
         action: 'autofillForm',
         formData: globalProfile.fields,
@@ -619,14 +650,14 @@ async function checkAndAutoFill(tabId, url) {
     } else {
       // No global profile, check for site-specific profiles
       const profiles = await retrieveChunkedData(STORAGE_CONFIG.SITE_PROFILES_KEY) || {};
-      
-      const matchingProfile = Object.values(profiles).find(profile => 
-        profile.urls && profile.urls.some(profileUrl => urlMatches(url, profileUrl))
+
+      const matchingProfile = Object.values(profiles).find(profile =>
+          profile.urls && profile.urls.some(profileUrl => urlMatches(url, profileUrl))
       );
-      
+
       if (matchingProfile) {
         console.log(`Auto-filling with site-specific profile: ${matchingProfile.label} for URL: ${url}`);
-        
+
         chrome.tabs.sendMessage(tabId, {
           action: 'autofillForm',
           formData: matchingProfile.fields,
