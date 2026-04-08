@@ -9,9 +9,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
 
     case 'autofillForm':
-      const result = autofillFormFields(request.formData, request.isAutomatic);
-      sendResponse({ success: true, filledCount: result.filledCount, errors: result.errors });
-      break;
+      autofillFormFields(request.formData, request.isAutomatic).then(result => {
+        sendResponse({ success: true, filledCount: result.filledCount, errors: result.errors });
+      });
+      return true; // Keep channel open for async response
 
     default:
       sendResponse({ error: 'Unknown action' });
@@ -86,16 +87,158 @@ function isElementVisible(element) {
   return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && element.offsetWidth > 0 && element.offsetHeight > 0;
 }
 
-function autofillFormFields(formData, isAutomatic = false) {
+// Parse a field name like "job[0][employment_type]" into its components.
+// Returns null if the name does not match the pattern.
+function parseIndexedName(name) {
+  const match = name && name.match(/^(.+?)\[(\d+)\]\[(.+)\]$/);
+  if (match) {
+    return { prefix: match[1], index: parseInt(match[2]), field: match[3] };
+  }
+  return null;
+}
+
+// Group form fields by their repeating section prefix and index.
+// Fields that don't match the pattern go into nonRepeating.
+function groupRepeatingFields(formData) {
+  const groups = {}; // { prefix: { index: [fields] } }
+  const nonRepeating = [];
+
+  formData.forEach(field => {
+    const parsed = parseIndexedName(field.name);
+    if (parsed) {
+      if (!groups[parsed.prefix]) groups[parsed.prefix] = {};
+      if (!groups[parsed.prefix][parsed.index]) groups[parsed.prefix][parsed.index] = [];
+      groups[parsed.prefix][parsed.index].push(field);
+    } else {
+      nonRepeating.push(field);
+    }
+  });
+
+  return { groups, nonRepeating };
+}
+
+// Escape a string for use as a CSS attribute value (inside double quotes).
+// Only backslash and double-quote are special inside CSS quoted strings.
+function escapeAttrValue(str) {
+  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+// Find the "Add more" button for a given repeating section prefix.
+// Walks up the DOM from an existing index-0 field looking for a button
+// whose text, value, id, or onclick suggests it adds new entries.
+// Falls back to a page-wide search if nothing is found while walking up.
+function findAddMoreButton(namePrefix) {
+  const firstField = document.querySelector(`[name^="${escapeAttrValue(namePrefix)}[0]["]`);
+  if (!firstField) {
+    console.warn(`[AutoFill] findAddMoreButton: no field found for prefix "${namePrefix}"`);
+    return null;
+  }
+
+  const ADD_RE = /add|more|\+/i;
+
+  function isAddButton(el) {
+    const text = (el.textContent || el.value || '').trim();
+    const id = (el.id || '').toLowerCase();
+    const cls = (el.className || '').toLowerCase();
+    const onclick = el.getAttribute('onclick') || '';
+    return ADD_RE.test(text) || ADD_RE.test(id) || ADD_RE.test(cls) || /add/i.test(onclick);
+  }
+
+  // Walk up the DOM tree from the field's parent
+  let container = firstField.parentElement;
+  while (container && container !== document.body) {
+    const candidates = container.querySelectorAll(
+      'button, input[type="button"], input[type="submit"], a[href], a[onclick], [onclick]'
+    );
+    for (const el of candidates) {
+      // Skip actual submit buttons unless they look like "add more"
+      if (el.type === 'submit' && !isAddButton(el)) continue;
+      if (isAddButton(el)) {
+        console.log(`[AutoFill] Found "Add more" button for "${namePrefix}":`, el);
+        return el;
+      }
+    }
+    container = container.parentElement;
+  }
+
+  // Page-wide fallback
+  const allCandidates = document.querySelectorAll(
+    'button, input[type="button"], a[href], a[onclick], [onclick]'
+  );
+  for (const el of allCandidates) {
+    if (isAddButton(el)) {
+      console.log(`[AutoFill] Found "Add more" button (page-wide fallback) for "${namePrefix}":`, el);
+      return el;
+    }
+  }
+
+  console.warn(`[AutoFill] "Add more" button not found for prefix "${namePrefix}"`);
+  return null;
+}
+
+// Wait for a section with the given prefix and index to appear in the DOM.
+// Resolves immediately if already present, otherwise uses MutationObserver.
+function waitForNewSection(namePrefix, index, timeout = 3000) {
+  return new Promise((resolve, reject) => {
+    const selector = `[name^="${escapeAttrValue(namePrefix)}[${index}]["]`;
+
+    if (document.querySelector(selector)) {
+      resolve();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Timeout waiting for ${namePrefix}[${index}] to appear`));
+    }, timeout);
+
+    const observer = new MutationObserver(() => {
+      if (document.querySelector(selector)) {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+}
+
+async function autofillFormFields(formData, isAutomatic = false) {
   let filledCount = 0;
   const errors = [];
 
-  formData.forEach(fieldData => {
+  console.log(`[AutoFill] Starting autofill with ${formData.length} fields`);
+
+  const { groups, nonRepeating } = groupRepeatingFields(formData);
+
+  console.log(`[AutoFill] Non-repeating fields: ${nonRepeating.length}`);
+  console.log(`[AutoFill] Indexed groups:`, Object.keys(groups).map(k => `${k}: indices [${Object.keys(groups[k]).join(',')}]`));
+
+  // Prefixes that have at least one index > 0 are truly repeating sections.
+  const repeatingPrefixes = Object.keys(groups).filter(prefix => {
+    const maxIndex = Math.max(...Object.keys(groups[prefix]).map(Number));
+    return maxIndex > 0;
+  });
+
+  console.log(`[AutoFill] Repeating prefixes detected:`, repeatingPrefixes);
+
+  // Fields to fill in the normal (synchronous) path:
+  // non-indexed fields plus any indexed groups that never exceed index 0.
+  const normalFields = [...nonRepeating];
+  Object.keys(groups).forEach(prefix => {
+    if (!repeatingPrefixes.includes(prefix)) {
+      Object.values(groups[prefix]).forEach(fields => fields.forEach(f => normalFields.push(f)));
+    }
+  });
+
+  // Fill normal fields
+  for (const fieldData of normalFields) {
     try {
       const elements = findElementsBySelector(fieldData);
       if (elements.length === 0) {
         errors.push(`Field not found: ${fieldData.selector}`);
-        return;
+        continue;
       }
       elements.forEach(element => {
         if (fillElement(element, fieldData)) filledCount++;
@@ -103,7 +246,54 @@ function autofillFormFields(formData, isAutomatic = false) {
     } catch (error) {
       errors.push(`Error filling field ${fieldData.selector}: ${error.message}`);
     }
-  });
+  }
+
+  // Fill repeating sections one index at a time.
+  // For index 0, the section already exists so we fill immediately.
+  // For index > 0, click "Add more", wait for the DOM to update, then fill.
+  for (const prefix of repeatingPrefixes) {
+    const indexedFields = groups[prefix];
+    const sortedIndices = Object.keys(indexedFields).map(Number).sort((a, b) => a - b);
+
+    console.log(`[AutoFill] Processing repeating section "${prefix}", indices:`, sortedIndices);
+
+    for (const index of sortedIndices) {
+      if (index > 0) {
+        const addBtn = findAddMoreButton(prefix);
+        if (!addBtn) {
+          const msg = `"Add more" button not found for section: ${prefix}`;
+          console.error(`[AutoFill] ${msg}`);
+          errors.push(msg);
+          continue;
+        }
+        console.log(`[AutoFill] Clicking "Add more" for "${prefix}[${index}]"`);
+        addBtn.click();
+        try {
+          await waitForNewSection(prefix, index);
+          console.log(`[AutoFill] Section "${prefix}[${index}]" appeared in DOM`);
+        } catch (err) {
+          console.error(`[AutoFill] ${err.message}`);
+          errors.push(err.message);
+          continue;
+        }
+      }
+
+      for (const fieldData of indexedFields[index]) {
+        try {
+          const elements = findElementsBySelector(fieldData);
+          if (elements.length === 0) {
+            errors.push(`Field not found: ${fieldData.selector}`);
+            continue;
+          }
+          elements.forEach(element => {
+            if (fillElement(element, fieldData)) filledCount++;
+          });
+        } catch (error) {
+          errors.push(`Error filling field ${fieldData.selector}: ${error.message}`);
+        }
+      }
+    }
+  }
 
   if (filledCount > 0) {
     showNotification(`Autofilled ${filledCount} fields`, errors.length > 0 ? 'warning' : 'success');
@@ -113,22 +303,32 @@ function autofillFormFields(formData, isAutomatic = false) {
 
 function findElementsBySelector(fieldData) {
   const elements = [];
-  try {
-    const selectorElements = document.querySelectorAll(fieldData.selector);
-    if (selectorElements.length > 0) {
-      elements.push(...selectorElements);
-      return elements;
-    }
-  } catch (e) {}
 
-  if (fieldData.name) {
-    const nameElements = document.querySelectorAll(`[name="${CSS.escape(fieldData.name)}"]`);
-    if (nameElements.length > 0) {
-      elements.push(...nameElements);
-      return elements;
+  // Try the stored CSS selector first
+  if (fieldData.selector) {
+    try {
+      const selectorElements = document.querySelectorAll(fieldData.selector);
+      if (selectorElements.length > 0) {
+        elements.push(...selectorElements);
+        return elements;
+      }
+    } catch (e) {
+      console.warn(`[AutoFill] Bad selector "${fieldData.selector}":`, e.message);
     }
   }
 
+  // Fallback: match by name attribute (escaping only " and \ for the CSS string)
+  if (fieldData.name) {
+    try {
+      const nameElements = document.querySelectorAll(`[name="${escapeAttrValue(fieldData.name)}"]`);
+      if (nameElements.length > 0) {
+        elements.push(...nameElements);
+        return elements;
+      }
+    } catch (e) {}
+  }
+
+  // Fallback: match by id
   if (fieldData.id) {
     const idElement = document.getElementById(fieldData.id);
     if (idElement) {
@@ -137,12 +337,15 @@ function findElementsBySelector(fieldData) {
     }
   }
 
+  // Fallback: match by placeholder
   if (fieldData.placeholder) {
-    const placeholderElements = document.querySelectorAll(`[placeholder="${CSS.escape(fieldData.placeholder)}"]`);
-    if (placeholderElements.length > 0) {
-      elements.push(...placeholderElements);
-      return elements;
-    }
+    try {
+      const placeholderElements = document.querySelectorAll(`[placeholder="${escapeAttrValue(fieldData.placeholder)}"]`);
+      if (placeholderElements.length > 0) {
+        elements.push(...placeholderElements);
+        return elements;
+      }
+    } catch (e) {}
   }
 
   return elements;
