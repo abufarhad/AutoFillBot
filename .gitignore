@@ -41,6 +41,7 @@ out/
 *.iml
 *.iws
 *.ipr
+/.claude
 
 # VSCode
 .vscode/
