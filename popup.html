@@ -5,313 +5,253 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form Autofill Saver</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            width: 400px;
-            min-height: 300px;
-            margin: 0;
-            padding: 16px;
+            width: 380px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 14px;
-            background-color: #f8f9fa;
+            background: #f0f2f5;
+            color: #212529;
         }
 
+        /* ── Header ──────────────────────────────── */
         .header {
+            background: #1a1d23;
+            padding: 14px 16px;
             display: flex;
             align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e9ecef;
+            justify-content: space-between;
         }
 
         .header h1 {
-            margin: 0;
-            font-size: 18px;
-            color: #212529;
-            flex: 1;
-        }
-
-        .current-site {
-            margin-bottom: 16px;
-            padding: 12px;
-            background-color: #e7f3ff;
-            border: 1px solid #b3d9ff;
-            border-radius: 4px;
-            font-size: 12px;
-            word-break: break-all;
-        }
-
-        .current-site strong {
-            color: #0056b3;
-        }
-
-        .section {
-            margin-bottom: 20px;
-        }
-
-        .section-title {
+            font-size: 15px;
             font-weight: 600;
-            margin-bottom: 8px;
-            color: #495057;
+            color: #fff;
+            letter-spacing: 0.2px;
         }
 
-        .save-form {
-            background-color: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 4px;
-            font-weight: 500;
-            color: #495057;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .form-group textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 12px;
-            box-sizing: border-box;
-            font-family: inherit;
-            resize: vertical;
-        }
-
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-        }
-
-        .btn {
+        .site-bar {
+            background: #fff;
+            border-bottom: 1px solid #e2e5ea;
             padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+            font-size: 12px;
+            color: #6c757d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .site-bar strong { color: #495057; }
+
+        /* ── Status message ──────────────────────── */
+        #statusMessage {
+            margin: 10px 16px 0;
+            padding: 8px 12px;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: 500;
-            transition: background-color 0.2s;
-            margin-right: 8px;
         }
 
-        .btn-primary {
-            background-color: #007bff;
-            color: white;
+        #statusMessage.status-success { background: #d1fadf; color: #1a6632; border: 1px solid #a3d9b1; }
+        #statusMessage.status-error   { background: #fde8e8; color: #9b1c1c; border: 1px solid #f8b4b4; }
+        #statusMessage.status-info    { background: #dbeafe; color: #1e3a5f; border: 1px solid #93c5fd; }
+
+        /* ── Sections ────────────────────────────── */
+        .section {
+            background: #fff;
+            border-radius: 8px;
+            margin: 12px 12px 0;
+            overflow: hidden;
+            border: 1px solid #e2e5ea;
         }
 
-        .btn-primary:hover {
-            background-color: #0056b3;
-        }
-        .global-profile {
-            margin-bottom: 20px;
-        }
-
-        .global-profile-info {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 12px;
-            margin-bottom: 12px;
-            font-size: 12px;
-        }
-
-        .global-profile-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .global-profile-actions .btn {
-            flex: 1;
-            min-width: 100px;
-        }
-
-        .btn-success {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-
-        .btn-success:hover {
-            background-color: #218838;
-            border-color: #1e7e34;
-        }
-
-        .btn-success:disabled {
-            background-color: #6c757d;
-            border-color: #6c757d;
-        }
-
-        .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: #545b62;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background-color: #c82333;
-        }
-
-        .btn-small {
-            padding: 4px 8px;
+        .section-header {
+            padding: 10px 14px 8px;
             font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #6c757d;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e2e5ea;
         }
 
-        .saved-profiles {
-            background-color: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
+        /* ── Capture strip ───────────────────────── */
+        .capture-strip {
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
+
+        #formStatus {
+            font-size: 13px;
+            color: #6c757d;
+        }
+
+        #formStatus.detected { color: #1a6632; font-weight: 500; }
+        #formStatus.none     { color: #9b1c1c; }
+
+        /* ── Profile list ─────────────────────────── */
+        #profilesList { padding: 4px 0; }
 
         .profile-item {
-            padding: 12px;
-            border-bottom: 1px solid #e9ecef;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid #f0f2f5;
+            gap: 10px;
         }
 
-        .profile-item:last-child {
-            border-bottom: none;
-        }
+        .profile-item:last-child { border-bottom: none; }
+        .profile-item:hover { background: #fafbfc; }
 
-        .profile-item:hover {
-            background-color: #f8f9fa;
-        }
+        .profile-item--global { background: #f8f0ff; }
+        .profile-item--global:hover { background: #f3e8ff; }
+
+        .profile-info { flex: 1; min-width: 0; }
 
         .profile-name {
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 600;
             color: #212529;
-            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .profile-actions {
-            display: flex;
-            gap: 4px;
+        .badge-default {
+            font-size: 10px;
+            font-weight: 700;
+            background: #7c3aed;
+            color: #fff;
+            padding: 1px 6px;
+            border-radius: 10px;
+            flex-shrink: 0;
         }
+
+        .profile-meta {
+            font-size: 11px;
+            color: #adb5bd;
+            margin-top: 2px;
+        }
+
+        .profile-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
         .empty-state {
+            padding: 24px 16px;
             text-align: center;
-            padding: 20px;
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        .status-message {
-            padding: 8px 12px;
-            border-radius: 4px;
-            margin-bottom: 12px;
+            color: #adb5bd;
             font-size: 12px;
+            line-height: 1.6;
         }
 
-        .status-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        /* ── Save form ────────────────────────────── */
+        .save-section { padding: 12px 14px; }
+
+        .save-row {
+            display: flex;
+            gap: 8px;
         }
 
-        .status-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .save-row input {
+            flex: 1;
+            padding: 7px 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
         }
 
-        .status-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+        .save-row input:focus { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,.15); }
+
+        /* ── Buttons ──────────────────────────────── */
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: opacity .15s, background .15s;
         }
 
-        .form-count {
-            font-size: 11px;
-            color: #6c757d;
-            margin-top: 4px;
-        }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #6c757d;
+        .btn-primary   { background: #7c3aed; color: #fff; }
+        .btn-primary:not(:disabled):hover { background: #6d28d9; }
+
+        .btn-success   { background: #059669; color: #fff; }
+        .btn-success:not(:disabled):hover { background: #047857; }
+
+        .btn-secondary { background: #e9ecef; color: #495057; }
+        .btn-secondary:not(:disabled):hover { background: #dee2e6; }
+
+        .btn-danger    { background: #dc3545; color: #fff; }
+        .btn-danger:not(:disabled):hover { background: #c82333; }
+
+        .btn-sm { padding: 4px 9px; font-size: 11px; }
+
+        /* ── Footer ───────────────────────────────── */
+        .footer {
+            padding: 10px 12px 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Form Autofill Saver</h1>
+        <button id="openDashboardBtn" class="btn btn-secondary btn-sm">Manage</button>
     </div>
 
-    <div id="statusMessage" class="status-message" style="display: none;"></div>
-
-    <div id="currentSite    <div class="header">
-        <strong>Current Site:</strong> <span id="currentSiteUrl">Loading...</span>
-        <button id="openDashboardBtn" class="btn btn-secondary btn-small" style="float: right;">Manage Profiles</button>
+    <div class="site-bar">
+        <strong>Site:</strong> <span id="currentSiteUrl">Loading…</span>
     </div>
+
+    <div id="statusMessage" style="display: none;"></div>
+
+    <!-- Current form capture status -->
     <div class="section">
-        <div class="section-title">Global Profile</div>
-        <div class="global-profile">
-            <div id="globalProfileStatus" class="loading">Checking global profile...</div>
-            <div id="globalProfileContainer" style="display: none;">
-                <div id="globalProfileInfo" class="global-profile-info"></div>
-                <div class="global-profile-actions">
-                    <button id="saveGlobalBtn" class="btn btn-primary" disabled>Save as Global Profile</button>
-                    <button id="useGlobalBtn" class="btn btn-success" style="display: none;">Use Global Profile</button>
-                    <button id="deleteGlobalBtn" class="btn btn-danger" style="display: none;">Delete Global Profile</button>
-                </div>
-            </div>
+        <div class="section-header">Current Form</div>
+        <div class="capture-strip">
+            <span id="formStatus">Detecting fields…</span>
+            <button id="captureBtn" class="btn btn-secondary btn-sm">Re-capture</button>
         </div>
+    </div>
 
-        <div class="section-title">Save Current Form</div>
-        <div class="save-form">
-            <div id="formDetectionStatus" class="loading">Detecting forms...</div>
-            <div id="saveFormContainer" style="display: none;">
-                <div class="form-group">
-                    <label for="profileLabel">Profile Name/Label</label>
-                    <input type="text" id="profileLabel" placeholder="Enter a name for this form profile" maxlength="50">
-                </div>
-                <div class="form-group">
-                    <label for="additionalUrls">Additional URLs (optional)</label>
-                    <textarea id="additionalUrls" placeholder="Enter additional URLs where this profile should work (one per line)" rows="3"></textarea>
-                    <small style="color: #6c757d; font-size: 11px;">Example: https://example.com/login, https://sub.example.com/signin</small>
-                </div>
-                <div id="formFieldsCount" class="form-count"></div>
-                <button id="saveFormBtn" class="btn btn-primary" disabled>Save Form Data</button>
+    <!-- All profiles -->
+    <div class="section">
+        <div class="section-header">Profiles</div>
+        <div id="profilesList">
+            <div class="empty-state">Loading profiles…</div>
+        </div>
+    </div>
+
+    <!-- Save as new profile (shown only when form data exists) -->
+    <div class="section" id="saveSection" style="display: none;">
+        <div class="section-header">Save as New Profile</div>
+        <div class="save-section">
+            <div class="save-row">
+                <input type="text" id="profileLabel" placeholder="Profile name, e.g. Software Engineer" maxlength="60">
+                <button id="saveFormBtn" class="btn btn-primary" disabled>Save</button>
             </div>
         </div>
     </div>
 
-    <div class="section">
-        <div class="section-title">Saved Profiles for This Site</div>
-        <div id="savedProfiles" class="saved-profiles">
-            <div class="loading">Loading saved profiles...</div>
-        </div>
+    <div class="footer">
+        <button id="openDashboardBtnFooter" class="btn btn-secondary btn-sm">Open Dashboard</button>
     </div>
 
     <script src="popup.js"></script>
 </body>
 </html>
-

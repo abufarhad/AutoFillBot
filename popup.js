@@ -1,400 +1,312 @@
 // Popup script for Form Autofill Saver
 
 let currentUrl = '';
+let currentTabId = null;
 let currentFormData = [];
 
-// DOM elements
-const currentSiteUrl = document.getElementById('currentSiteUrl');
-const statusMessage = document.getElementById('statusMessage');
-const openDashboardBtn = document.getElementById('openDashboardBtn');
-const globalProfileStatus = document.getElementById('globalProfileStatus');
-const globalProfileContainer = document.getElementById('globalProfileContainer');
-const globalProfileInfo = document.getElementById('globalProfileInfo');
-const saveGlobalBtn = document.getElementById('saveGlobalBtn');
-const useGlobalBtn = document.getElementById('useGlobalBtn');
-const deleteGlobalBtn = document.getElementById('deleteGlobalBtn');
-const formDetectionStatus = document.getElementById('formDetectionStatus');
-const saveFormContainer = document.getElementById('saveFormContainer');
-const profileLabel = document.getElementById('profileLabel');
-const additionalUrls = document.getElementById('additionalUrls');
-const formFieldsCount = document.getElementById('formFieldsCount');
-const saveFormBtn = document.getElementById('saveFormBtn');
-const savedProfiles = document.getElementById('savedProfiles');
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-// Initialize popup
 document.addEventListener('DOMContentLoaded', () => {
-  setupEventListeners();
-  getCurrentTabInfo();
+  document.getElementById('openDashboardBtn').addEventListener('click', openDashboard);
+  document.getElementById('openDashboardBtnFooter').addEventListener('click', openDashboard);
+  document.getElementById('captureBtn').addEventListener('click', captureFormData);
+  document.getElementById('profileLabel').addEventListener('input', validateSaveBtn);
+  document.getElementById('saveFormBtn').addEventListener('click', saveCurrentForm);
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    currentTabId = tabs[0].id;
+    currentUrl = tabs[0].url;
+
+    try {
+      const urlObj = new URL(currentUrl);
+      document.getElementById('currentSiteUrl').textContent = urlObj.hostname + urlObj.pathname;
+    } catch (_) {
+      document.getElementById('currentSiteUrl').textContent = currentUrl;
+    }
+
+    captureFormData();
+    loadAllProfiles();
+  });
 });
 
-// Setup event listeners
-function setupEventListeners() {
-  openDashboardBtn.addEventListener('click', openDashboard);
-  saveGlobalBtn.addEventListener('click', saveGlobalProfile);
-  useGlobalBtn.addEventListener('click', useGlobalProfile);
-  deleteGlobalBtn.addEventListener('click', deleteGlobalProfile);
-  saveFormBtn.addEventListener('click', saveCurrentForm);
-  profileLabel.addEventListener('input', validateSaveForm);
-}
-
-// Open dashboard
 function openDashboard() {
-  chrome.tabs.create({
-    url: chrome.runtime.getURL('dashboard.html')
-  });
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 }
 
-// Get current tab information
-function getCurrentTabInfo() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      currentUrl = tabs[0].url;
-      const urlObj = new URL(currentUrl);
-      currentSiteUrl.textContent = urlObj.hostname + urlObj.pathname;
-      
-      // Load global profile status
-      loadGlobalProfile();
-      
-      // Get form data from current tab
-      getFormDataFromCurrentTab(tabs[0].id);
-      
-      // Load saved profiles for this site
-      loadSavedProfiles();
-    }
-  });
-}
+// ── Form capture ──────────────────────────────────────────────────────────────
 
-// Get form data from current tab
-function getFormDataFromCurrentTab(tabId) {
-  chrome.runtime.sendMessage({
-    action: 'getFormData',
-    tabId: tabId
-  }, (response) => {
+function captureFormData() {
+  const formStatus = document.getElementById('formStatus');
+  formStatus.textContent = 'Detecting fields…';
+  formStatus.className = '';
+
+  chrome.runtime.sendMessage({ action: 'getFormData', tabId: currentTabId }, (response) => {
     if (response && response.success) {
       currentFormData = response.formData || [];
-      updateFormStatus();
     } else {
-      formDetectionStatus.textContent = 'No forms detected';
-      formDetectionStatus.className = 'error';
+      currentFormData = [];
     }
+    updateFormStatus();
   });
 }
 
-// Update form status and enable/disable buttons
 function updateFormStatus() {
-  const fieldCount = currentFormData.length;
-  
-  if (fieldCount > 0) {
-    formDetectionStatus.textContent = `${fieldCount} form fields detected`;
-    formDetectionStatus.className = 'success';
-    formFieldsCount.textContent = `${fieldCount} form fields detected`;
-    saveFormContainer.style.display = 'block';
-    globalProfileContainer.style.display = 'block';
-    
-    // Enable global save button if form data exists
-    saveGlobalBtn.disabled = false;
-    
-    validateSaveForm();
+  const formStatus = document.getElementById('formStatus');
+  const saveSection = document.getElementById('saveSection');
+  const count = currentFormData.length;
+
+  if (count > 0) {
+    formStatus.textContent = `${count} fields captured`;
+    formStatus.className = 'detected';
+    saveSection.style.display = 'block';
   } else {
-    formDetectionStatus.textContent = 'No filled form fields detected';
-    formDetectionStatus.className = 'error';
-    saveFormContainer.style.display = 'none';
-    
-    // Disable global save button if no form data
-    saveGlobalBtn.disabled = true;
+    formStatus.textContent = 'No filled fields detected';
+    formStatus.className = 'none';
+    saveSection.style.display = 'none';
   }
+
+  validateSaveBtn();
 }
 
-// Validate save form inputs
-function validateSaveForm() {
-  const label = profileLabel.value.trim();
-  const hasFormData = currentFormData.length > 0;
-  
-  saveFormBtn.disabled = !label || !hasFormData;
-}
+// ── Load & render profiles ────────────────────────────────────────────────────
 
-// Load global profile status
-function loadGlobalProfile() {
-  chrome.runtime.sendMessage({
-    action: 'getGlobalProfile'
-  }, (response) => {
-    if (response && response.success && response.profile) {
-      // Global profile exists
-      globalProfileStatus.style.display = 'none';
-      globalProfileContainer.style.display = 'block';
-      
-      const profile = response.profile;
-      globalProfileInfo.innerHTML = `
-        <strong>Global Profile:</strong> ${profile.label}<br>
-        <small>${profile.fields.length} fields saved on ${new Date(profile.createdAt).toLocaleDateString()}</small>
-      `;
-      
-      useGlobalBtn.style.display = 'inline-block';
-      deleteGlobalBtn.style.display = 'inline-block';
-      saveGlobalBtn.textContent = 'Update Global Profile';
-    } else {
-      // No global profile
-      globalProfileStatus.textContent = 'No global profile saved';
-      globalProfileStatus.className = 'info';
-      globalProfileContainer.style.display = 'block';
-      
-      globalProfileInfo.innerHTML = '<em>Save your form data as a global profile to use it on any site.</em>';
-      
-      useGlobalBtn.style.display = 'none';
-      deleteGlobalBtn.style.display = 'none';
-      saveGlobalBtn.textContent = 'Save as Global Profile';
-    }
+function loadAllProfiles() {
+  document.getElementById('profilesList').innerHTML =
+    '<div class="empty-state">Loading profiles…</div>';
+
+  let globalProfile = null;
+  let siteProfiles = {};
+  let pending = 2;
+
+  function onLoaded() {
+    if (--pending === 0) renderProfilesList(globalProfile, siteProfiles);
+  }
+
+  chrome.runtime.sendMessage({ action: 'getGlobalProfile' }, (res) => {
+    if (res && res.success && res.profile) globalProfile = res.profile;
+    onLoaded();
+  });
+
+  chrome.runtime.sendMessage({ action: 'getAllSiteProfiles' }, (res) => {
+    if (res && res.success) siteProfiles = res.profiles || {};
+    onLoaded();
   });
 }
 
-// Save global profile
+function renderProfilesList(globalProfile, siteProfiles) {
+  const list = document.getElementById('profilesList');
+  list.innerHTML = '';
+
+  const named = Object.values(siteProfiles);
+
+  if (!globalProfile && named.length === 0) {
+    list.innerHTML =
+      '<div class="empty-state">No profiles saved yet.<br>Fill a form, then save it as a profile below.</div>';
+    return;
+  }
+
+  if (globalProfile) {
+    list.appendChild(buildProfileItem({
+      name: globalProfile.label || 'Global Profile',
+      fieldCount: globalProfile.fields ? globalProfile.fields.length : 0,
+      isGlobal: true,
+    }));
+  }
+
+  named.forEach(profile => {
+    list.appendChild(buildProfileItem({
+      name: profile.label,
+      fieldCount: profile.fields ? profile.fields.length : 0,
+      id: profile.id,
+      isGlobal: false,
+    }));
+  });
+}
+
+function buildProfileItem({ name, fieldCount, id, isGlobal }) {
+  const item = document.createElement('div');
+  item.className = 'profile-item' + (isGlobal ? ' profile-item--global' : '');
+
+  // Info
+  const info = document.createElement('div');
+  info.className = 'profile-info';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'profile-name';
+
+  if (isGlobal) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-default';
+    badge.textContent = 'Default';
+    nameEl.appendChild(badge);
+  }
+
+  const nameText = document.createTextNode(name);
+  nameEl.appendChild(nameText);
+
+  const meta = document.createElement('div');
+  meta.className = 'profile-meta';
+  meta.textContent = `${fieldCount} fields`;
+
+  info.appendChild(nameEl);
+  info.appendChild(meta);
+
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'profile-actions';
+
+  const fillBtn = document.createElement('button');
+  fillBtn.className = 'btn btn-success btn-sm';
+  fillBtn.textContent = 'Fill Form';
+  fillBtn.addEventListener('click', () => {
+    isGlobal ? fillWithGlobal() : fillWithProfile(id);
+  });
+
+  actions.appendChild(fillBtn);
+
+  if (!isGlobal) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn btn-danger btn-sm';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deleteProfile(id, item));
+    actions.appendChild(deleteBtn);
+  } else {
+    const updateBtn = document.createElement('button');
+    updateBtn.className = 'btn btn-secondary btn-sm';
+    updateBtn.textContent = 'Update';
+    updateBtn.title = 'Replace global profile with current form data';
+    updateBtn.addEventListener('click', saveGlobalProfile);
+    actions.appendChild(updateBtn);
+  }
+
+  item.appendChild(info);
+  item.appendChild(actions);
+  return item;
+}
+
+// ── Fill actions ──────────────────────────────────────────────────────────────
+
+function fillWithGlobal() {
+  chrome.runtime.sendMessage(
+    { action: 'useGlobalProfile', tabId: currentTabId },
+    (res) => {
+      if (res && res.success) {
+        showStatus(`Filled ${res.filledCount} fields using Global Profile`, 'success');
+      } else {
+        showStatus('Error: ' + (res?.error || 'Unknown error'), 'error');
+      }
+    }
+  );
+}
+
+function fillWithProfile(profileId) {
+  chrome.runtime.sendMessage(
+    { action: 'getFullProfileData', profileId },
+    (res) => {
+      if (!res || !res.success) {
+        showStatus('Error loading profile: ' + (res?.error || 'Unknown error'), 'error');
+        return;
+      }
+      chrome.runtime.sendMessage(
+        {
+          action: 'autofillFormAndAddSite',
+          tabId: currentTabId,
+          profileId,
+          currentUrl,
+          profileData: res.profile,
+        },
+        (fillRes) => {
+          if (fillRes && fillRes.success) {
+            const extra = fillRes.siteAdded ? ' (site added to profile)' : '';
+            showStatus(`Filled ${fillRes.filledCount} fields${extra}`, 'success');
+            if (fillRes.siteAdded) loadAllProfiles();
+          } else {
+            showStatus('Error during fill: ' + (fillRes?.error || 'Unknown error'), 'error');
+          }
+        }
+      );
+    }
+  );
+}
+
+// ── Save profile ──────────────────────────────────────────────────────────────
+
+function validateSaveBtn() {
+  const label = document.getElementById('profileLabel').value.trim();
+  document.getElementById('saveFormBtn').disabled = !label || currentFormData.length === 0;
+}
+
+function saveCurrentForm() {
+  const label = document.getElementById('profileLabel').value.trim();
+  if (!label || currentFormData.length === 0) return;
+
+  const saveBtn = document.getElementById('saveFormBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  chrome.runtime.sendMessage(
+    { action: 'saveFormProfile', label, urls: [currentUrl], formData: currentFormData },
+    (res) => {
+      saveBtn.textContent = 'Save';
+      if (res && res.success) {
+        showStatus(`Profile "${label}" saved`, 'success');
+        document.getElementById('profileLabel').value = '';
+        validateSaveBtn();
+        loadAllProfiles();
+      } else {
+        saveBtn.disabled = false;
+        showStatus('Error saving: ' + (res?.error || 'Unknown error'), 'error');
+      }
+    }
+  );
+}
+
 function saveGlobalProfile() {
   if (currentFormData.length === 0) {
-    showStatus('No form data to save', 'error');
+    showStatus('Capture form data first', 'info');
     return;
   }
-  
-  saveGlobalBtn.disabled = true;
-  saveGlobalBtn.textContent = 'Saving...';
-  
-  chrome.runtime.sendMessage({
-    action: 'saveGlobalProfile',
-    formData: currentFormData
-  }, (response) => {
-    saveGlobalBtn.disabled = false;
-    
-    if (response && response.success) {
-      showStatus(response.message, 'success');
-      loadGlobalProfile(); // Refresh global profile display
+
+  chrome.runtime.sendMessage(
+    { action: 'saveGlobalProfile', formData: currentFormData },
+    (res) => {
+      if (res && res.success) {
+        showStatus('Global profile updated', 'success');
+        loadAllProfiles();
+      } else {
+        showStatus('Error: ' + (res?.error || 'Unknown error'), 'error');
+      }
+    }
+  );
+}
+
+function deleteProfile(profileId, itemEl) {
+  if (!confirm('Delete this profile?')) return;
+  chrome.runtime.sendMessage({ action: 'deleteProfile', profileId }, (res) => {
+    if (res && res.success) {
+      itemEl.remove();
+      showStatus('Profile deleted', 'success');
+      // If list is now empty, re-render to show empty state
+      if (document.getElementById('profilesList').children.length === 0) {
+        loadAllProfiles();
+      }
     } else {
-      showStatus('Error saving global profile: ' + (response?.error || 'Unknown error'), 'error');
-      saveGlobalBtn.textContent = 'Save as Global Profile';
+      showStatus('Error deleting: ' + (res?.error || 'Unknown error'), 'error');
     }
   });
 }
 
-// Use global profile to autofill current form
-function useGlobalProfile() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      chrome.runtime.sendMessage({
-        action: 'useGlobalProfile',
-        tabId: tabs[0].id
-      }, (response) => {
-        if (response && response.success) {
-          showStatus(`Autofilled ${response.filledCount} fields using global profile`, 'success');
-          
-          if (response.errors && response.errors.length > 0) {
-            console.warn('Autofill errors:', response.errors);
-          }
-        } else {
-          showStatus('Error using global profile: ' + (response?.error || 'Unknown error'), 'error');
-        }
-      });
-    }
-  });
-}
+// ── Status helper ─────────────────────────────────────────────────────────────
 
-// Delete global profile
-function deleteGlobalProfile() {
-  if (!confirm('Are you sure you want to delete the global profile?')) {
-    return;
-  }
-  
-  chrome.runtime.sendMessage({
-    action: 'deleteGlobalProfile'
-  }, (response) => {
-    if (response && response.success) {
-      showStatus(response.message, 'success');
-      loadGlobalProfile(); // Refresh global profile display
-    } else {
-      showStatus('Error deleting global profile: ' + (response?.error || 'Unknown error'), 'error');
-    }
-  });
-}
+let statusTimer = null;
 
-// Save current form data
-function saveCurrentForm() {
-  const label = profileLabel.value.trim();
-  const additionalUrlsText = additionalUrls.value.trim();
-  
-  if (!label) {
-    showStatus('Please enter a profile name', 'error');
-    return;
-  }
-  
-  if (currentFormData.length === 0) {
-    showStatus('No form data to save', 'error');
-    return;
-  }
-  
-  // Parse additional URLs
-  const urls = [currentUrl]; // Always include current URL
-  if (additionalUrlsText) {
-    const additionalUrlsList = additionalUrlsText.split('\n')
-      .map(url => url.trim())
-      .filter(url => url.length > 0);
-    urls.push(...additionalUrlsList);
-  }
-  
-  saveFormBtn.disabled = true;
-  saveFormBtn.textContent = 'Saving...';
-  
-  chrome.runtime.sendMessage({
-    action: 'saveFormProfile',
-    label: label,
-    urls: urls,
-    formData: currentFormData
-  }, (response) => {
-    saveFormBtn.disabled = false;
-    saveFormBtn.textContent = 'Save Form Data';
-    
-    if (response && response.success) {
-      showStatus(response.message, 'success');
-      profileLabel.value = '';
-      additionalUrls.value = '';
-      validateSaveForm();
-      loadSavedProfiles(); // Refresh the profiles list
-    } else {
-      showStatus('Error saving profile: ' + (response?.error || 'Unknown error'), 'error');
-    }
-  });
-}
-
-// Load saved profiles for current site
-function loadSavedProfiles() {
-  chrome.runtime.sendMessage({
-    action: 'getProfilesForSite',
-    url: currentUrl
-  }, (response) => {
-    if (response && response.profiles) {
-      renderSavedProfiles(response.profiles);
-    } else {
-      savedProfiles.innerHTML = '<div class="error">Error loading profiles</div>';
-    }
-  });
-}
-
-// Render saved profiles list
-function renderSavedProfiles(profiles) {
-  if (profiles.length === 0) {
-    savedProfiles.innerHTML = '<div class="empty-state">No saved profiles for this site</div>';
-    return;
-  }
-  
-  savedProfiles.innerHTML = '';
-  
-  profiles.forEach(profile => {
-    const profileItem = document.createElement('div');
-    profileItem.className = 'profile-item';
-    
-    const profileInfo = document.createElement('div');
-    profileInfo.className = 'profile-name';
-    profileInfo.textContent = profile.label;
-    
-    const fieldCount = document.createElement('div');
-    fieldCount.className = 'form-count';
-    fieldCount.textContent = `${profile.fieldCount} fields, ${profile.urlCount} URLs`;
-    
-    const profileActions = document.createElement('div');
-    profileActions.className = 'profile-actions';
-    
-    const autofillBtn = document.createElement('button');
-    autofillBtn.className = 'btn btn-primary btn-small';
-    autofillBtn.textContent = 'Autofill';
-    autofillBtn.addEventListener('click', () => autofillWithProfile(profile.id));
-    
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn btn-danger btn-small';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => deleteProfile(profile.id));
-    
-    profileActions.appendChild(autofillBtn);
-    profileActions.appendChild(deleteBtn);
-    
-    const profileContent = document.createElement('div');
-    profileContent.style.flex = '1';
-    profileContent.appendChild(profileInfo);
-    profileContent.appendChild(fieldCount);
-    
-    profileItem.appendChild(profileContent);
-    profileItem.appendChild(profileActions);
-    
-    savedProfiles.appendChild(profileItem);
-  });
-}
-
-// Autofill form with selected profile
-function autofillWithProfile(profileId) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      // First get the full profile data
-      chrome.runtime.sendMessage({
-        action: 'getFullProfileData',
-        profileId: profileId
-      }, (response) => {
-        if (response && response.success) {
-          // Now trigger autofill with dynamic site addition
-          chrome.runtime.sendMessage({
-            action: 'autofillFormAndAddSite',
-            tabId: tabs[0].id,
-            profileId: profileId,
-            currentUrl: currentUrl,
-            profileData: response.profile
-          }, (autofillResponse) => {
-            if (autofillResponse && autofillResponse.success) {
-              let message = `Autofilled ${autofillResponse.filledCount} fields`;
-              if (autofillResponse.siteAdded) {
-                message += ` and added this site to the profile`;
-              }
-              showStatus(message, 'success');
-              
-              if (autofillResponse.errors && autofillResponse.errors.length > 0) {
-                console.warn('Autofill errors:', autofillResponse.errors);
-              }
-              
-              // Refresh the profiles list to show updated URL count
-              loadSavedProfiles();
-            } else {
-              showStatus('Error during autofill: ' + (autofillResponse?.error || 'Unknown error'), 'error');
-            }
-          });
-        } else {
-          showStatus('Error loading profile data: ' + (response?.error || 'Unknown error'), 'error');
-        }
-      });
-    }
-  });
-}
-
-// Delete a saved profile
-function deleteProfile(profileId) {
-  if (!confirm(`Are you sure you want to delete this profile?`)) {
-    return;
-  }
-  
-  chrome.runtime.sendMessage({
-    action: 'deleteProfile',
-    profileId: profileId
-  }, (response) => {
-    if (response && response.success) {
-      showStatus(response.message, 'success');
-      loadSavedProfiles(); // Refresh the profiles list
-    } else {
-      showStatus('Error deleting profile: ' + (response?.error || 'Unknown error'), 'error');
-    }
-  });
-}
-
-// Show status message
 function showStatus(message, type) {
-  statusMessage.textContent = message;
-  statusMessage.className = `status ${type}`;
-  statusMessage.style.display = 'block';
-  
-  // Hide after 3 seconds
-  setTimeout(() => {
-    statusMessage.style.display = 'none';
-  }, 3000);
-}
+  const el = document.getElementById('statusMessage');
+  el.textContent = message;
+  el.className = `status-${type}`;
+  el.style.display = 'block';
 
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
