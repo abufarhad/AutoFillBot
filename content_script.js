@@ -1,5 +1,6 @@
 // Content script for Form Autofill Saver
 
+// Listen for messages from background script and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case 'captureFormData': {
@@ -96,6 +97,8 @@ function parseIndexedName(name) {
   return m ? { prefix: m[1], index: parseInt(m[2]), field: m[3] } : null;
 }
 
+// Group form fields by their repeating section prefix and index.
+// Fields that don't match the pattern go into nonRepeating.
 function groupRepeatingFields(formData) {
   const groups = {};
   const nonRepeating = [];
