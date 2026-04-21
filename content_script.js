@@ -1,15 +1,43 @@
 // Content script for Form Autofill Saver
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SITE EXCLUSION LIST
+// Add any hostname (or partial hostname) where autofill should never run.
+// ─────────────────────────────────────────────────────────────────────────────
+const EXCLUDED_SITES = [
+  'github.com',
+  'gitlab.com',
+  'twitter.com',
+  'x.com',
+  'facebook.com',
+  'instagram.com',
+  'reddit.com',
+  'youtube.com',
+  'linkedin.com',
+];
+
+function isExcludedSite() {
+  return EXCLUDED_SITES.some(site => location.hostname.includes(site));
+}
+
 // Listen for messages from background script and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case 'captureFormData': {
+      if (isExcludedSite()) {
+        sendResponse({ success: false, error: 'Site is excluded from autofill.' });
+        break;
+      }
       const formData = captureCurrentFormData();
       sendResponse({ success: true, formData: formData, fieldCount: formData.length });
       break;
     }
 
     case 'autofillForm':
+      if (isExcludedSite()) {
+        sendResponse({ success: false, error: 'Site is excluded from autofill.' });
+        return;
+      }
       autofillFormFields(request.formData, request.isAutomatic).then(result => {
         sendResponse({ success: true, filledCount: result.filledCount, errors: result.errors });
       });
@@ -119,6 +147,8 @@ function groupRepeatingFields(formData) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADD MORE button detection
+// FIX: Stricter matching — button must be near a form field, not just any
+// element containing "add" or "more" on the page.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Safe escape for CSS attribute selectors (only " and \ are special inside "…")
@@ -133,9 +163,9 @@ function findAddMoreButton(namePrefix) {
     if (el && isElementVisible(el)) return el;
   }
 
-  const ADD_RE = /add|more|\+/i;
+  // Matches "add", "add more", "+" — but NOT "more" alone (which matches GitHub buttons).
+  const ADD_RE = /\badd\b|\b\+\b/i;
 
-  // Read only direct text nodes so SVG children don't pollute the match
   function isAddButton(el) {
     const ownText = [...el.childNodes]
         .filter(n => n.nodeType === Node.TEXT_NODE)
@@ -144,12 +174,12 @@ function findAddMoreButton(namePrefix) {
     return ADD_RE.test(ownText)
         || ADD_RE.test(el.id || '')
         || ADD_RE.test(el.className || '')
-        || /add/i.test(el.getAttribute('onclick') || '');
+        || /\badd\b/i.test(el.getAttribute('onclick') || '');
   }
 
   // 2. Walk up from an existing index-0 field of this prefix.
-  //    IMPORTANT: querySelectorAll('[name^="job["]') is INVALID CSS — raw brackets
-  //    are not allowed in attribute selectors. Use getElementsByTagName + filter instead.
+  //    Only search within the closest form container — prevents
+  //    accidentally matching unrelated buttons elsewhere on the page.
   const prefix0 = namePrefix + '[0]';
   let firstField = null;
   for (const el of document.querySelectorAll('input, select, textarea')) {
@@ -157,19 +187,31 @@ function findAddMoreButton(namePrefix) {
   }
 
   if (firstField) {
-    let container = firstField.parentElement;
-    while (container && container !== document.body) {
-      for (const el of container.querySelectorAll('button, input[type="button"], a[onclick], [onclick]')) {
-        if (el.type === 'submit' && !isAddButton(el)) continue;
+    // FIX: Limit search to the nearest <form> ancestor (or a reasonable container).
+    // This prevents matching buttons outside the form entirely.
+    const formAncestor = firstField.closest('form') || firstField.closest('section') || firstField.parentElement;
+    if (formAncestor) {
+      for (const el of formAncestor.querySelectorAll('button, input[type="button"], a[onclick], [onclick]')) {
+        if (el.type === 'submit') continue; // never treat submit as add-more
         if (isAddButton(el)) return el;
       }
-      container = container.parentElement;
     }
   }
 
-  // 3. Page-wide fallback
+  // 3. Page-wide fallback — only if a form ancestor search found nothing.
+  //    Must be inside a <form> tag OR adjacent to form fields.
+  //    This prevents matching activity/navigation buttons on sites like GitHub.
   for (const el of document.querySelectorAll('button, input[type="button"], a[onclick], [onclick]')) {
-    if (isAddButton(el)) return el;
+    if (!isAddButton(el)) continue;
+    // Only accept if the button lives inside a <form> element
+    if (el.closest('form')) return el;
+    // Or if there are form inputs nearby (within 3 ancestor levels)
+    let parent = el.parentElement;
+    for (let i = 0; i < 3; i++) {
+      if (!parent) break;
+      if (parent.querySelector('input, select, textarea')) return el;
+      parent = parent.parentElement;
+    }
   }
 
   return null;
