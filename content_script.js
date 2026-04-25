@@ -86,7 +86,7 @@ function getValue(element) {
 // For named fields we store the raw name attribute (e.g. job[1][designation]).
 // Lookup is done via getElementsByName so no CSS escaping is ever needed.
 function generateSelector(element) {
-  if (element.name) return element.name;           // job[1][designation]  ← clean!
+  if (element.name) return element.name;
   if (element.id)   return '#' + element.id;
   if (element.placeholder) return '[placeholder="' + element.placeholder + '"]';
   return generateCSSSelector(element);
@@ -156,30 +156,36 @@ function escapeAttrValue(str) {
   return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+// Matches full button text exactly — prevents false matches like "Add to Cart"
+const ADD_MORE_TEXT_RE = /^add\s+more$/i;
+const ADD_MORE_ATTR_RE = /^add-?more$|^addMore$/i;
+
+function isAddButton(el) {
+  const ownText = [...el.childNodes]
+      .filter(n => n.nodeType === Node.TEXT_NODE)
+      .map(n => n.textContent.trim())
+      .join(' ')
+      .trim();
+
+  // Must match full text — prevents "Add to Cart", "Add Item", etc.
+  if (ownText && ADD_MORE_TEXT_RE.test(ownText)) return true;
+
+  // ID or class must contain "more"/"new"/"another" alongside "add"
+  if (ADD_MORE_ATTR_RE.test(el.id || '')) return true;
+  if (ADD_MORE_ATTR_RE.test(el.className || '')) return true;
+  if (ADD_MORE_ATTR_RE.test(el.getAttribute('onclick') || '')) return true;
+
+  return false;
+}
+
 function findAddMoreButton(namePrefix) {
-  // 1. Known IDs — covers Teletalk/BAB and common form builders
-  for (const id of ['addNewJob', 'addMoreBtn', 'add-more', 'addMore', 'addExp', 'addNewExp']) {
+  // 1. Known IDs
+  for (const id of ['addNewJob', 'addMoreBtn', 'add-more', 'addMore', 'addExp', 'addNewExp', 'add-more-btn', 'addMoreSection']) {
     const el = document.getElementById(id);
     if (el && isElementVisible(el)) return el;
   }
 
-  // Matches "add", "add more", "+" — but NOT "more" alone (which matches GitHub buttons).
-  const ADD_RE = /\badd\b|\b\+\b/i;
-
-  function isAddButton(el) {
-    const ownText = [...el.childNodes]
-        .filter(n => n.nodeType === Node.TEXT_NODE)
-        .map(n => n.textContent.trim())
-        .join(' ');
-    return ADD_RE.test(ownText)
-        || ADD_RE.test(el.id || '')
-        || ADD_RE.test(el.className || '')
-        || /\badd\b/i.test(el.getAttribute('onclick') || '');
-  }
-
-  // 2. Walk up from an existing index-0 field of this prefix.
-  //    Only search within the closest form container — prevents
-  //    accidentally matching unrelated buttons elsewhere on the page.
+  // 2. Walk up from an existing index-0 field of this prefix
   const prefix0 = namePrefix + '[0]';
   let firstField = null;
   for (const el of document.querySelectorAll('input, select, textarea')) {
@@ -391,7 +397,6 @@ function fillElement(element, fieldData) {
   return false;
 }
 
-// Use the native value setter so React/Vue controlled inputs notice the change
 function setNativeValue(el, value) {
   const proto  = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
