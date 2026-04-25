@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Form Autofill Saver - Dashboard</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -19,27 +15,22 @@
             line-height: 1.6;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
+        /* ── Header ── */
         .header {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255,255,255,0.95);
             backdrop-filter: blur(10px);
             padding: 25px 30px;
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             margin-bottom: 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .header h1 {
-            color: #2d3748;
             font-size: 28px;
             font-weight: 700;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -48,59 +39,35 @@
             background-clip: text;
         }
 
+        /* ── Buttons ── */
         .btn {
-            padding: 12px 24px;
+            padding: 10px 20px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
-            text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn-primary  { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
+        .btn-success  { background: linear-gradient(135deg,#48bb78,#38a169); color: white; }
+        .btn-danger   { background: linear-gradient(135deg,#f56565,#e53e3e); color: white; }
+        .btn-secondary{ background: linear-gradient(135deg,#a0aec0,#718096); color: white; }
+        .btn-small    { padding: 5px 12px; font-size: 12px; }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            color: white;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
-            color: white;
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-
+        /* ── Section cards ── */
         .section {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255,255,255,0.95);
             backdrop-filter: blur(10px);
             padding: 30px;
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .section-title {
@@ -112,31 +79,25 @@
             border-bottom: 3px solid #e2e8f0;
             position: relative;
         }
-
         .section-title::after {
             content: '';
             position: absolute;
-            bottom: -3px;
-            left: 0;
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            bottom: -3px; left: 0;
+            width: 60px; height: 3px;
+            background: linear-gradient(135deg,#667eea,#764ba2);
             border-radius: 2px;
         }
 
+        /* ── Profile card ── */
         .profile-card {
             background: #f7fafc;
             border: 2px solid #e2e8f0;
             border-radius: 12px;
             padding: 25px;
             margin-bottom: 20px;
-            transition: all 0.3s ease;
+            transition: all 0.2s;
         }
-
-        .profile-card:hover {
-            border-color: #cbd5e0;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        }
+        .profile-card:hover { border-color: #cbd5e0; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 
         .profile-header {
             display: flex;
@@ -145,155 +106,92 @@
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 2px solid #e2e8f0;
-        }
-
-        .profile-name {
-            font-weight: 700;
-            font-size: 18px;
-            color: #2d3748;
-        }
-
-        .profile-name input {
-            font-weight: 700;
-            font-size: 18px;
-            color: #2d3748;
-            background: transparent;
-            border: none;
-            outline: none;
-            width: 100%;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .profile-name input:focus {
-            background-color: white;
-            box-shadow: 0 0 0 2px #667eea;
-        }
-
-        .profile-actions {
-            display: flex;
+            flex-wrap: wrap;
             gap: 10px;
         }
 
+        .profile-name { font-weight: 700; font-size: 18px; color: #2d3748; flex: 1; }
+        .profile-name input {
+            font-weight: 700; font-size: 18px; color: #2d3748;
+            background: transparent; border: none; outline: none;
+            width: 100%; padding: 4px 8px; border-radius: 4px;
+        }
+        .profile-name input:focus { background: white; box-shadow: 0 0 0 2px #667eea; }
+
+        .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ── Detail pills ── */
         .profile-details {
             margin-bottom: 20px;
-            font-size: 14px;
-            color: #718096;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 10px;
         }
+        .detail-item { background: white; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .detail-label { font-weight: 600; color: #4a5568; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .detail-value { font-size: 14px; color: #2d3748; margin-top: 4px; }
 
-        .detail-item {
-            background: white;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
+        /* ── URLs ── */
+        .urls-section { margin-bottom: 20px; }
+        .urls-title, .fields-title { font-weight: 600; color: #4a5568; font-size: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .url-list { display: flex; flex-direction: column; gap: 8px; }
+        .url-item { display: flex; align-items: center; gap: 10px; background: white; padding: 10px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .url-input { flex: 1; border: none; outline: none; font-size: 13px; color: #4a5568; background: transparent; padding: 4px; border-radius: 4px; }
+        .url-input:focus { background: #f7fafc; box-shadow: 0 0 0 2px #667eea; }
+        .remove-url { background:#fed7d7;color:#c53030;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px; }
+        .remove-url:hover { background:#feb2b2; }
+        .add-url { background:#c6f6d5;color:#22543d;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;margin-top:10px; }
+        .add-url:hover { background:#9ae6b4; }
 
-        .detail-label {
-            font-weight: 600;
-            color: #4a5568;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        /* ── Fields ── */
+        .fields-section { margin-top: 20px; }
 
-        .detail-value {
-            font-size: 14px;
-            color: #2d3748;
-            margin-top: 4px;
-        }
-
-        .urls-section {
-            margin-bottom: 20px;
-        }
-
-        .urls-title {
-            font-weight: 600;
-            color: #4a5568;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-
-        .url-list {
+        /* Entry tabs for multi-entry profiles */
+        .entry-tabs {
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            gap: 6px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
         }
-
-        .url-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .entry-tab {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 2px solid #e2e8f0;
             background: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .url-input {
-            flex: 1;
-            border: none;
-            outline: none;
-            font-size: 13px;
-            color: #4a5568;
-            background: transparent;
-            padding: 4px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .url-input:focus {
-            background-color: #f7fafc;
-            box-shadow: 0 0 0 2px #667eea;
-        }
-
-        .remove-url {
-            background: #fed7d7;
-            color: #c53030;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background-color 0.2s;
-        }
-
-        .remove-url:hover {
-            background: #feb2b2;
-        }
-
-        .add-url {
-            background: #c6f6d5;
-            color: #22543d;
-            border: none;
-            border-radius: 6px;
-            padding: 8px 16px;
             cursor: pointer;
             font-size: 12px;
             font-weight: 600;
-            margin-top: 10px;
-            transition: background-color 0.2s;
+            color: #718096;
+            transition: all 0.2s;
         }
-
-        .add-url:hover {
-            background: #9ae6b4;
+        .entry-tab.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg,#667eea,#764ba2);
+            color: white;
         }
+        .entry-tab:hover:not(.active) { border-color: #a0aec0; color: #4a5568; }
 
-        .fields-section {
-            margin-top: 20px;
-        }
-
-        .fields-title {
+        .entry-badge {
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
             font-weight: 600;
-            color: #4a5568;
-            margin-bottom: 15px;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            vertical-align: middle;
+        }
+
+        .field-header-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 100px 40px;
+            gap: 12px;
+            margin-bottom: 8px;
+            padding: 0 15px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #718096;
         }
 
         .field-item {
@@ -301,199 +199,85 @@
             grid-template-columns: 1fr 2fr 100px 40px;
             gap: 12px;
             align-items: center;
-            margin-bottom: 12px;
-            padding: 15px;
+            margin-bottom: 10px;
+            padding: 14px;
             background: white;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            transition: border-color 0.2s;
         }
-
-        .field-item:hover {
-            border-color: #cbd5e0;
-        }
+        .field-item:hover { border-color: #cbd5e0; }
 
         .field-input {
-            padding: 8px 12px;
+            padding: 7px 10px;
             border: 1px solid #e2e8f0;
             border-radius: 6px;
             font-size: 13px;
-            transition: all 0.2s;
             background: #f7fafc;
+            width: 100%;
         }
+        .field-input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); background: white; }
 
-        .field-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            background: white;
-        }
+        .remove-field { background:#fed7d7;color:#c53030;border:none;border-radius:4px;padding:6px;cursor:pointer;font-size:12px;width:32px;height:32px;display:flex;align-items:center;justify-content:center; }
+        .remove-field:hover { background:#feb2b2; }
 
-        .field-label {
-            font-weight: 600;
-            font-size: 12px;
-            color: #4a5568;
-            text-align: center;
-        }
+        .add-field { background:#c6f6d5;color:#22543d;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:12px;font-weight:600;margin-top:12px; }
+        .add-field:hover { background:#9ae6b4; }
 
-        .remove-field {
-            background: #fed7d7;
-            color: #c53030;
-            border: none;
-            border-radius: 4px;
-            padding: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.2s;
-        }
+        /* ── Empty / loading ── */
+        .empty-state { text-align:center;color:#a0aec0;font-style:italic;padding:60px 20px;background:#f7fafc;border-radius:12px;border:2px dashed #e2e8f0; }
+        .loading { text-align:center;color:#718096;padding:40px;font-size:16px; }
 
-        .remove-field:hover {
-            background: #feb2b2;
-        }
-
-        .add-field {
-            background: #c6f6d5;
-            color: #22543d;
-            border: none;
-            border-radius: 6px;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 15px;
-            transition: background-color 0.2s;
-        }
-
-        .add-field:hover {
-            background: #9ae6b4;
-        }
-
-        .empty-state {
-            text-align: center;
-            color: #a0aec0;
-            font-style: italic;
-            padding: 60px 20px;
-            background: #f7fafc;
-            border-radius: 12px;
-            border: 2px dashed #e2e8f0;
-        }
-
-        .loading {
-            text-align: center;
-            color: #718096;
-            padding: 40px;
-            font-size: 16px;
-        }
-
-        .status-message {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-message.success {
-            background: #c6f6d5;
-            color: #22543d;
-            border: 1px solid #9ae6b4;
-        }
-
-        .status-message.error {
-            background: #fed7d7;
-            color: #c53030;
-            border: 1px solid #feb2b2;
-        }
-
-        .status-message.info {
-            background: #bee3f8;
-            color: #2a69ac;
-            border: 1px solid #90cdf4;
-        }
+        /* ── Status / save indicator ── */
+        .status-message { padding:14px 18px;border-radius:8px;margin-bottom:20px;font-size:14px;font-weight:500; }
+        .status-message.success { background:#c6f6d5;color:#22543d;border:1px solid #9ae6b4; }
+        .status-message.error   { background:#fed7d7;color:#c53030;border:1px solid #feb2b2; }
+        .status-message.info    { background:#bee3f8;color:#2a69ac;border:1px solid #90cdf4; }
 
         .save-indicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #48bb78;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            opacity: 0;
-            transform: translateY(-20px);
-            transition: all 0.3s ease;
-            z-index: 1000;
+            position:fixed;top:20px;right:20px;background:#48bb78;color:white;
+            padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;
+            opacity:0;transform:translateY(-20px);transition:all 0.3s ease;z-index:1000;
         }
-
-        .save-indicator.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .save-indicator.show { opacity:1;transform:translateY(0); }
 
         @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            
-            .field-item {
-                grid-template-columns: 1fr;
-                gap: 8px;
-            }
-            
-            .profile-header {
-                flex-direction: column;
-                gap: 15px;
-                align-items: stretch;
-            }
+            .container { padding: 15px; }
+            .header { flex-direction: column; gap: 15px; text-align: center; }
+            .field-item, .field-header-row { grid-template-columns: 1fr; gap: 8px; }
+            .profile-header { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Form Autofill Saver Dashboard</h1>
-            <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
-        </div>
+<div class="container">
 
-        <div id="statusMessage" class="status-message" style="display: none;"></div>
-        <div id="saveIndicator" class="save-indicator">✓ Saved</div>
+    <div class="header">
+        <h1>Form Autofill Saver Dashboard</h1>
+        <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+    </div>
 
-        <!-- Global Profile Section -->
-        <div class="section">
-            <div class="section-title">🌍 Global Profile</div>
-            <div id="globalProfileContainer">
-                <div id="globalProfileLoading" class="loading">Loading global profile...</div>
-                <div id="globalProfileContent" style="display: none;"></div>
-            </div>
-        </div>
+    <div id="statusMessage" class="status-message" style="display:none;"></div>
+    <div id="saveIndicator" class="save-indicator">✓ Saved</div>
 
-        <!-- Site-Specific Profiles Section -->
-        <div class="section">
-            <div class="section-title">🌐 Site-Specific Profiles</div>
-            <div id="siteProfilesContainer">
-                <div id="siteProfilesLoading" class="loading">Loading site-specific profiles...</div>
-                <div id="siteProfilesContent" style="display: none;"></div>
-            </div>
+    <!-- Global Profile -->
+    <div class="section">
+        <div class="section-title">🌍 Global Profile</div>
+        <div id="globalProfileContainer">
+            <div id="globalProfileLoading" class="loading">Loading global profile...</div>
+            <div id="globalProfileContent" style="display:none;"></div>
         </div>
     </div>
 
-    <script src="dashboard.js"></script>
+    <!-- Site-Specific Profiles -->
+    <div class="section">
+        <div class="section-title">🌐 Site-Specific Profiles</div>
+        <div id="siteProfilesContainer">
+            <div id="siteProfilesLoading" class="loading">Loading site-specific profiles...</div>
+            <div id="siteProfilesContent" style="display:none;"></div>
+        </div>
+    </div>
+
+</div>
+<script src="dashboard.js"></script>
 </body>
 </html>
-
